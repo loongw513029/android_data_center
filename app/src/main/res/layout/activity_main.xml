@@ -16,14 +16,14 @@
             android:id="@+id/ipc_view2"
             android:layout_width="640dp"
             android:layout_height="360dp"
-            android:layout_centerInParent="true"
-            android:layout_alignParentLeft="true"/>
+            android:layout_alignParentRight="true"
+            android:layout_centerInParent="true" />
 
         <com.sztvis.datacenter.media.widget.IpCameraView
             android:id="@+id/ipc_view1"
             android:layout_width="640dp"
             android:layout_height="360dp"
-            android:layout_alignParentRight="true"/>
+            android:layout_alignParentLeft="true" />
     </RelativeLayout>
 
     <LinearLayout
@@ -43,25 +43,93 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="60dp"
+                android:layout_margin="0dp"
                 android:layout_marginLeft="20dp"
                 android:gravity="center"
+                android:padding="0dp"
                 android:text="设备编码:"
                 android:textSize="24sp" />
 
             <EditText
                 android:id="@+id/tx_code"
                 android:layout_width="150dp"
+                android:layout_height="60dp"
+                android:text="T-1" />
+            <Button
+                android:layout_width="wrap_content"
                 android:layout_height="50dp"
                 android:layout_marginTop="5dp"
-                android:focusable="false"
-                android:text="T-1"/>
-
+                android:text="修改"
+                android:background="@drawable/bg_button"
+                android:id="@+id/btn_update"
+                android:layout_marginLeft="5dp"
+                android:textColor="#ffffff"/>
             <TextView
                 android:id="@+id/tip_txt"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="15dp"
+                android:text="人脸数：0"
                 android:textSize="24sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:layout_weight="0"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="30dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="100dp"
+                        android:layout_height="30dp"
+                        android:gravity="center_vertical|right"
+                        android:text="服务器状态:" />
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@mipmap/ic_green"
+                        android:layout_marginTop="5dp"
+                        android:layout_marginLeft="5dp"
+                        android:id="@+id/server_state"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="30dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="100dp"
+                        android:layout_height="30dp"
+                        android:gravity="center_vertical|right"
+                        android:text="GPS状态:" />
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@mipmap/ic_green"
+                        android:layout_marginTop="5dp"
+                        android:layout_marginLeft="5dp"
+                        android:id="@+id/gps_state"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="50dp"
+                android:layout_height="60dp"
+                android:gravity="center"
+                android:id="@+id/txt_ver"
+                android:text="版本\nv1.0.1" />
         </LinearLayout>
 
         <LinearLayout

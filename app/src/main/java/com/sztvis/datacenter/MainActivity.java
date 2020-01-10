@@ -6,12 +6,19 @@ import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.net.Uri;
 import android.opengl.GLSurfaceView;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -23,6 +30,7 @@ import android.widget.Toast;
 
 import com.arcsoft.face.ActiveFileInfo;
 import com.arcsoft.face.ErrorInfo;
+import com.arcsoft.face.Face3DAngle;
 import com.arcsoft.face.FaceEngine;
 import com.arcsoft.face.FaceInfo;
 import com.arcsoft.face.enums.DetectFaceOrientPriority;
@@ -31,9 +39,13 @@ import com.arcsoft.face.enums.DetectModel;
 import com.arcsoft.imageutil.ArcSoftImageFormat;
 import com.arcsoft.imageutil.ArcSoftImageUtil;
 import com.arcsoft.imageutil.ArcSoftImageUtilError;
+import com.blankj.utilcode.util.AppUtils;
+import com.blankj.utilcode.util.SPUtils;
+import com.blankj.utilcode.util.ToastUtils;
 import com.jeremyliao.liveeventbus.LiveEventBus;
 import com.sztvis.datacenter.app.BaseApplication;
 import com.sztvis.datacenter.media.widget.IpCameraView;
+import com.sztvis.datacenter.socket.vo.GpsInfo;
 import com.sztvis.datacenter.utils.Constants;
 import com.sztvis.datacenter.utils.FileUtils;
 import com.sztvis.datacenter.utils.HttpUtils;
@@ -78,8 +90,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private TextView tipTxt;
 
     EditText txCode;
+    Button updateBtn;
 
     Button btn1, btn2;
+
+    ImageView serverState, gpsState;
+
+    TextView txtVer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,9 +108,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btn2 = (Button) findViewById(R.id.btn2);
         tipTxt = (TextView) findViewById(R.id.tip_txt);
         txCode = (EditText) findViewById(R.id.tx_code);
+        updateBtn = (Button) findViewById(R.id.btn_update);
+        serverState = (ImageView) findViewById(R.id.server_state);
+        gpsState = (ImageView) findViewById(R.id.gps_state);
+        txtVer = (TextView) findViewById(R.id.txt_ver);
+        txtVer.setText("版本\nv" + AppUtils.getAppVersionName());
         btn1.setOnClickListener(this);
         btn2.setOnClickListener(this);
-        BaseApplication.DevCode = txCode.getText().toString();
+        updateBtn.setOnClickListener(this);
+        BaseApplication.DevCode = SPUtils.getInstance().getString(Constants.SP_DEVICECODE, "T-1");
+        txCode.setText(SPUtils.getInstance().getString(Constants.SP_DEVICECODE, "T-1"));
+        //txCode.setOn
         requestPermiss();
 
     }
@@ -106,7 +131,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void requestPermiss() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_PHONE_STATE}, 0);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_PHONE_STATE,Manifest.permission.WRITE_SETTINGS}, 0);
         } else {
             searchIpc();
             activeEngine();
@@ -119,6 +144,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     @Override
                     public void onChanged(Long currentTimeMillis) {
                         String base64 = screenShot(0, currentTimeMillis + "");
+                    }
+                });
+        LiveEventBus.get(Constants.BUS_KEY_GPS, Boolean.class)
+                .observe(this, new androidx.lifecycle.Observer<Boolean>() {
+                    @Override
+                    public void onChanged(Boolean aBoolean) {
+                        if (aBoolean) {
+                            gpsState.setImageResource(R.mipmap.ic_green);
+                        } else {
+                            gpsState.setImageResource(R.mipmap.ic_red);
+                        }
+                    }
+                });
+        LiveEventBus.get(Constants.BUS_KEY_NETWORK, Boolean.class)
+                .observe(this, new androidx.lifecycle.Observer<Boolean>() {
+                    @Override
+                    public void onChanged(Boolean aBoolean) {
+                        if (aBoolean) {
+                            serverState.setImageResource(R.mipmap.ic_green);
+                        } else {
+                            serverState.setImageResource(R.mipmap.ic_red);
+                        }
                     }
                 });
     }
@@ -169,7 +216,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         FileOutputStream fos = null;
         try {
             fos = new FileOutputStream(path);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 50, fos);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -274,7 +321,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void initFaceEngine() {
         ftEngine = new FaceEngine();
-        ftInitCode = ftEngine.init(this, DetectMode.ASF_DETECT_MODE_IMAGE, DetectFaceOrientPriority.ASF_OP_0_ONLY,
+        ftInitCode = ftEngine.init(this, DetectMode.ASF_DETECT_MODE_IMAGE, DetectFaceOrientPriority.ASF_OP_ALL_OUT,
                 16, 16, FaceEngine.ASF_FACE_DETECT | FaceEngine.ASF_AGE | FaceEngine.ASF_FACE3DANGLE | FaceEngine.ASF_GENDER | FaceEngine.ASF_LIVENESS);
         if (ftInitCode != ErrorInfo.MOK) {
             String error = getString(R.string.specific_engine_init_failed, "ftEngine", ftInitCode);
@@ -312,6 +359,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 ipCameraView1.setVisibility(View.INVISIBLE);
                 ipCameraView2.setVisibility(View.VISIBLE);
                 break;
+            case R.id.btn_update:
+                String code = txCode.getText().toString().trim();
+                if (code.equals("")) {
+                    ToastUtils.showShort("设备编码不能为空");
+                    return;
+                }
+                SPUtils.getInstance().put(Constants.SP_DEVICECODE, code);
+                BaseApplication.DevCode = code;
+                byte[] byte2 = new byte[]{(byte) 0xBF, (byte) 0xCF, 0x00, 0x03, 0x04, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, (byte) 0xDF, (byte) 0xEF};
+                byte[] b2 = code.getBytes();
+                System.arraycopy(b2,0,byte2,6,b2.length);
+                ToastUtils.showShort("修改成功");
+
+                break;
         }
     }
 
@@ -319,7 +380,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         public void run() {
             while (true) {
+                //判断车辆是否处理静止状态
+                GpsInfo gpsInfo = BaseApplication.currentGps;
+                if (gpsInfo == null) continue;
+                Log.d(TAG, gpsInfo.getSpeed() + "");
+                if (gpsInfo.getSpeed() > 0) continue;
+
                 Bitmap bitmapTemp = ipCameraView2.screenShot2();
+                Bitmap cavBitmap = bitmapTemp;
                 //Log.d(TAG, bitmapTemp.getWidth() + "," + bitmapTemp.getHeight());
                 FileOutputStream fos1 = null;
                 try {
@@ -360,6 +428,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         Log.i(TAG, "processImage: fd costTime = " + (System.currentTimeMillis() - fdStartTime));
                         Log.i(TAG, "faceSize:" + faceInfoList.size());
                     }
+                    /**
+                     * 3.判断人脸的3D信息，排除半张脸
+                     */
+                    int faceProcessCode = ftEngine.process(bgr24, width, height, FaceEngine.CP_PAF_BGR24, faceInfoList, FaceEngine.ASF_FACE3DANGLE | FaceEngine.ASF_LIVENESS);
+                    if (faceProcessCode == ErrorInfo.MOK) {
+                        List<Face3DAngle> face3DAngleList = new ArrayList<>();
+                        ftEngine.getFace3DAngle(face3DAngleList);
+                        for (int i = 0; i < face3DAngleList.size(); i++) {
+                            Face3DAngle face3DAngle = face3DAngleList.get(i);
+                            if (face3DAngle.getYaw() > Constants.FACE_DEVIATION || face3DAngle.getYaw() < -Constants.FACE_DEVIATION) {
+                                faceInfoList.remove(i);
+                            }
+                            Log.d(TAG, "Face3DAngle:Pitch:" + face3DAngle.getPitch() + ",Yaw:" + face3DAngle.getYaw());
+                        }
+                    }
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -374,13 +457,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         if (!file1.exists()) {
                             file1.mkdirs();
                         }
-                        FileUtils.copy(Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "temp.jpg",
-                                file1.getAbsolutePath() + File.separator + System.currentTimeMillis() + ".jpg");
-                        Log.d(TAG, "文件复制成功，路径：" + file1.getAbsolutePath() + File.separator + System.currentTimeMillis() + ".jpg");
-                        String b64 = ImageUtils.ImageToBase64(Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "temp.jpg");
-                        HttpUtils.saveFaceDetectRecord(b64,faceInfoList.size());
+                        /**
+                         * 绘制红色矩形框在图片上
+                         */
+                        Canvas canvas = new Canvas(cavBitmap);
+                        Paint paint = new Paint();
+                        paint.setColor(Color.RED);//红色边线
+                        paint.setStyle(Paint.Style.STROKE);//不填充
+                        paint.setStrokeWidth(1);  //线的宽度
+                        for (FaceInfo faceInfo : faceInfoList) {
+                            canvas.drawRect(faceInfo.getRect(), paint);
+                        }
+                        String filePath = file1.getAbsolutePath() + File.separator + System.currentTimeMillis() + ".jpg";
+                        fos1 = new FileOutputStream(filePath);
+                        cavBitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos1);
+                        fos1.close();
+//                        FileUtils.copy(Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "temp.jpg",
+//                                file1.getAbsolutePath() + File.separator + System.currentTimeMillis() + ".jpg");
+//                        Log.d(TAG, "文件复制成功，路径：" + file1.getAbsolutePath() + File.separator + System.currentTimeMillis() + ".jpg");
+                        String b64 = ImageUtils.ImageToBase64(filePath);
+                        HttpUtils.saveFaceDetectRecord(b64, faceInfoList.size());
                     }
-                    Thread.sleep(800);
+                    Thread.sleep(300);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

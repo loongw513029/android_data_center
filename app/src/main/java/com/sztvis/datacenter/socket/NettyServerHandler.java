@@ -5,14 +5,20 @@ import android.util.Log;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONException;
+import com.sztvis.datacenter.app.BaseApplication;
+import com.sztvis.datacenter.socket.decoder.MessageDecoder;
 import com.sztvis.datacenter.socket.vo.BaseMsg;
+import com.sztvis.datacenter.utils.ByteUtil;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class NettyServerHandler extends ChannelInboundHandlerAdapter {
@@ -38,6 +44,7 @@ public class NettyServerHandler extends ChannelInboundHandlerAdapter {
     private ChannelHandlerContext channelHandler;
 
     private String equipId;
+    private byte[] temp = new byte[1024];
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -69,9 +76,28 @@ public class NettyServerHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        String request = (String) msg;
-        Log.i(TAG, "request:" + request);
-        dealData(ctx, request);
+        channelHandler = ctx;
+        ByteBuf bb = (ByteBuf) msg;
+        // 创建一个和buf同等长度的字节数组
+        byte[] reqByte = new byte[bb.readableBytes()];
+        // 将buf中的数据读取到数组中
+        bb.readBytes(reqByte);
+        if (reqByte.length > 5) {
+            System.arraycopy(temp, 0, reqByte, 0, bb.readableBytes());
+            int length = 0;
+            //Log.i("IOT1",Arrays.toString(res));
+            for (int i = 0; i < reqByte.length; i++) {
+                if ((reqByte[i] & 0xFF) == 0xDF && (reqByte[i + 1] & 0xFF) == 0xEF) {
+                    byte[] bts = new byte[i + 2 - length];
+                    System.arraycopy(reqByte, length, bts, 0, i + 2 - length);
+                    Log.i("IOT2", ByteUtil.byteToHex(bts));
+                    length = i + 2;
+                    dealData(ctx, reqByte);
+                }
+            }
+        }
+        Log.i(TAG, "request:" + ByteBufUtil.hexDump(reqByte));
+
     }
 
 
@@ -79,6 +105,7 @@ public class NettyServerHandler extends ChannelInboundHandlerAdapter {
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         cause.printStackTrace();
         Log.i(TAG, "exceptionCaught");
+
         if (ctx.channel().isActive()) {
             mListener.onRemoveChannel(this);
             ctx.close();
@@ -86,37 +113,24 @@ public class NettyServerHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
-    public void sendDataAPI(String equipId, String sendData) {
+    public void sendDataAPI(String equipId, byte[] bytes) {
         if (channelHandler != null) {
-            channelHandler.writeAndFlush(Unpooled.copiedBuffer(sendData.getBytes()));
-            Log.i(TAG, "向设备" + equipId + "发送了数据:" + sendData);
+            channelHandler.channel().writeAndFlush(bytes);
+            Log.i(TAG, "向设备" + equipId + "发送了数据:" + ByteUtil.byteToHex(bytes));
         }
     }
 
-    private void dealData(ChannelHandlerContext ctx, String msg) {
-        Log.i(TAG, "->  " + msg);
+    private void dealData(ChannelHandlerContext ctx, byte[] bytes) {
+        //Log.i(TAG, "->  " + msg);
+
         try {
-            channelHandler = ctx;
-            BaseMsg baseMsg = JSON.parseObject(msg, BaseMsg.class);
-            switch (baseMsg.getT()) {
-                case SocketType.HEALTH://心跳
-                    break;
-                case SocketType.PAYRECORD:
-                    break;
-                case SocketType.GPS:
-                    break;
-                case SocketType.ONKEYALARM:
-                    break;
-                case SocketType.ONKEYINSPECT:
-                    break;
-                case SocketType.CAN:
-                    break;
-                case SocketType.KELIU:
-                    break;
-                case SocketType.SAFEBEAT:
-                    break;
-                case SocketType.TALKSYSTEM:
-                    break;
+
+            if (BaseApplication.socketIsAlive) {
+                BaseApplication.tcpSocket.send(bytes);
+            }
+            MessageDecoder messageDecoder = new MessageDecoder(bytes, this);
+            if (messageDecoder.checkCrc()) {
+                messageDecoder.decode();
             }
             //从信息中获取设备ID
             //equipId = "";

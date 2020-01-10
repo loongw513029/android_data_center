@@ -61,8 +61,30 @@ public class HttpUtils {
         return null;
     }
 
+    public static String get(String url) {
+        final Request request = new Request.Builder()
+                .url(url)
+                .build();
+        Call call = client.newCall(request);
+        Response response = null;
+        try {
+            response = call.execute();
+            String res = request.body().toString();
+            Log.d("HttpUtils", res);
+            return res;
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+        }
+        return null;
+    }
+
     public static String saveSwingCardRecord(String card_no, long timespan, String pic) {
-        String time = TimeUtils.millis2String(timespan, new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
+        String time = DateUtil.StringToString(timespan + "", "yyyyMMddHHmmss", "yyyy-MM-dd HH:mm:ss");
         String jsonStr = "{\"dev_code\":\"" + BaseApplication.DevCode + "\",\"card_no\":\"" + card_no + "\",\"location\":\"\",\"site_name\":\"\",\"shot_image\":\"" + pic + "\",\"update_time\":\"" + time + "\"}";
         if (NetworkUtils.isAvailableByPing(Constants.HOST)) {
             return postJSON("/dataTerminal/saveCardData", jsonStr);
@@ -83,5 +105,14 @@ public class HttpUtils {
             return null;
         }
     }
+
+    public static ApiResponse getServerTime() {
+        if (NetworkUtils.isAvailableByPing(Constants.HOST)) {
+            String res = get("/platfrom/checkTime");
+            return JSON.parseObject(res, ApiResponse.class);
+        }
+        return null;
+    }
+
 
 }

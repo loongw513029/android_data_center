@@ -28,7 +28,7 @@ public class NettyServer implements onChannelOperation {
     private EventLoopGroup bossGroup = new NioEventLoopGroup();
     private EventLoopGroup workerGroup = new NioEventLoopGroup();
 
-    private static final ConcurrentHashMap<NettyServerHandler, SocketChannel> channelMap = new ConcurrentHashMap<>();
+    public static final ConcurrentHashMap<NettyServerHandler, SocketChannel> channelMap = new ConcurrentHashMap<>();
 
     public void start() {
         try {
@@ -40,16 +40,11 @@ public class NettyServer implements onChannelOperation {
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
-                            ByteBuf byteBuf = Unpooled.copiedBuffer("#".getBytes());
-                            socketChannel.pipeline().addLast(new IdleStateHandler(60, 0, 0, TimeUnit.SECONDS));
-                            socketChannel.pipeline().addLast(new DelimiterBasedFrameDecoder(1024, byteBuf));
-                            socketChannel.pipeline().addLast(new StringDecoder(Charset.forName("UTF-8")));
-                            socketChannel.pipeline().addLast(new StringEncoder(Charset.forName("UTF-8")));
-                            Log.i(TAG,"有客户端连接了:" + socketChannel);
+                            Log.i(TAG, "有客户端连接了:" + socketChannel);
                             NettyServerHandler scobj = new NettyServerHandler(NettyServer.this);
                             socketChannel.pipeline().addLast(scobj);
                             channelMap.put(scobj, socketChannel);
-                            Log.i(TAG,"socket通道数量:" + "--" + channelMap.size());
+                            Log.i(TAG, "socket通道数量:" + "--" + channelMap.size());
                         }
                     })
                     .option(ChannelOption.SO_BACKLOG, 32 * 1024)// 设置TCP缓冲区
@@ -57,8 +52,8 @@ public class NettyServer implements onChannelOperation {
                     .option(ChannelOption.SO_RCVBUF, 64 * 1024) //接收数据缓冲区
                     .childOption(ChannelOption.SO_KEEPALIVE, true);//保持连接
 
-            ChannelFuture future = bootstrap.bind(3333).sync();
-            Log.i(TAG, "服务器已启动,端口：" + 3333);
+            ChannelFuture future = bootstrap.bind(8087).sync();
+            Log.i(TAG, "服务器已启动,端口：" + 8087);
             future.channel().closeFuture().sync();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -116,13 +111,20 @@ public class NettyServer implements onChannelOperation {
      * @param dev_sn
      * @param msg
      */
-    public static void sendData(String dev_sn, String msg) {
+    public static void sendData(String dev_sn, byte[] msg) {
         if (socketIsAlive(dev_sn)) {
             for (Map.Entry<NettyServerHandler, SocketChannel> entry : channelMap.entrySet()) {
                 if (entry.getKey().getEquipId().equals(dev_sn)) {
                     entry.getKey().sendDataAPI(dev_sn, msg);
                 }
             }
+        }
+    }
+
+    public static void sendDataToALL(byte[] msg) {
+        for (Map.Entry<NettyServerHandler, SocketChannel> entry : channelMap.entrySet()) {
+            entry.getKey().sendDataAPI(entry.getKey().getEquipId(), msg);
+            Log.d("NettyServer","发送对象:"+entry.getKey().getChannelHandler().channel());
         }
     }
 

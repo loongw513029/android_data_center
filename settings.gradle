@@ -1,1 +1,1 @@
-include ':app',':ijkplayer'
+include ':app',':ijkplayer',':android_onvif',':base_socket'
