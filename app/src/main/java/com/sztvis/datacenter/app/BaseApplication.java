@@ -35,10 +35,6 @@ import com.sztvis.datacenter.utils.HttpUtils;
 import com.sztvis.datacenter.utils.TimeUtil;
 import com.wp.android_onvif.onvif.SetSystemDateAndTimeThread;
 import com.wp.android_onvif.util.OnvifSdk;
-
-import java.io.UnsupportedEncodingException;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +46,7 @@ public class BaseApplication extends Application {
     public static GpsInfo currentGps = null;
     public static BaseTcpSocket tcpSocket = null;
     public static boolean socketIsAlive = false;
-
+    NettyServer nettyServer;
     @Override
     public void onCreate() {
         super.onCreate();
@@ -72,7 +68,7 @@ public class BaseApplication extends Application {
                 new Thread() {
                     @Override
                     public void run() {
-                        NettyServer nettyServer = new NettyServer();
+                        nettyServer = new NettyServer();
                         nettyServer.start();
                     }
                 }.start();
@@ -219,7 +215,9 @@ public class BaseApplication extends Application {
                 byte[] bytes = new byte[size];
                 System.arraycopy(data, 0, bytes, 0, size);
                 Log.d("154返回", ByteUtil.byteToHex(bytes));
-                NettyServer.sendDataToALL(bytes);
+                if(bytes[4] == 0x01 && bytes[5] == 0x01) {
+                    NettyServer.sendDataToALL(bytes);
+                }
 
 
             }

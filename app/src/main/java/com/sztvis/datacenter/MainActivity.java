@@ -45,11 +45,14 @@ import com.blankj.utilcode.util.ToastUtils;
 import com.jeremyliao.liveeventbus.LiveEventBus;
 import com.sztvis.datacenter.app.BaseApplication;
 import com.sztvis.datacenter.media.widget.IpCameraView;
+import com.sztvis.datacenter.socket.NettyServer;
 import com.sztvis.datacenter.socket.vo.GpsInfo;
 import com.sztvis.datacenter.utils.Constants;
 import com.sztvis.datacenter.utils.FileUtils;
 import com.sztvis.datacenter.utils.HttpUtils;
 import com.sztvis.datacenter.utils.ImageUtils;
+import com.sztvis.datacenter.utils.UpdateInterface;
+import com.sztvis.datacenter.utils.UpdateUtil;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -94,7 +97,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     Button btn1, btn2;
 
-    ImageView serverState, gpsState;
+    ImageView serverState, gpsState, engineState;
 
     TextView txtVer;
 
@@ -111,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         updateBtn = (Button) findViewById(R.id.btn_update);
         serverState = (ImageView) findViewById(R.id.server_state);
         gpsState = (ImageView) findViewById(R.id.gps_state);
+        engineState = (ImageView) findViewById(R.id.engine_state);
         txtVer = (TextView) findViewById(R.id.txt_ver);
         txtVer.setText("版本\nv" + AppUtils.getAppVersionName());
         btn1.setOnClickListener(this);
@@ -119,6 +123,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         BaseApplication.DevCode = SPUtils.getInstance().getString(Constants.SP_DEVICECODE, "T-1");
         txCode.setText(SPUtils.getInstance().getString(Constants.SP_DEVICECODE, "T-1"));
         //txCode.setOn
+        UpdateUtil.checkHaveNewApp(this, new UpdateInterface() {
+            @Override
+            public void haveNewApp(boolean haveNewApp) {
+
+            }
+        });
         requestPermiss();
 
     }
@@ -131,7 +141,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void requestPermiss() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_PHONE_STATE,Manifest.permission.WRITE_SETTINGS}, 0);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_PHONE_STATE, Manifest.permission.WRITE_SETTINGS}, 0);
         } else {
             searchIpc();
             activeEngine();
@@ -230,7 +240,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
         Toast.makeText(this, "截图成功", Toast.LENGTH_SHORT).show();
         if (bitmap != null) {
-            String base64Str = ImageUtils.ImageToBase64(path);
+            String base64Str = ImageUtils.ImageToBase64(path).replaceAll("\r\n", "").replaceAll("\n","");
             BaseApplication.Ch1Base64Shot = base64Str;
             return base64Str;
         }
@@ -290,13 +300,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     @Override
                     public void onNext(Integer activeCode) {
                         if (activeCode == ErrorInfo.MOK) {
+                            Toast.makeText(MainActivity.this, "引擎激活成功", Toast.LENGTH_SHORT).show();
+                            engineState.setImageResource(R.mipmap.ic_green);
                             initFaceEngine();
                         } else if (activeCode == ErrorInfo.MERR_ASF_ALREADY_ACTIVATED) {
+                            Toast.makeText(MainActivity.this, "引擎已激活", Toast.LENGTH_SHORT).show();
+                            engineState.setImageResource(R.mipmap.ic_green);
                             //Toast.makeText(MainActivity.this,"激活失败",Toast.LENGTH_SHORT).show();
                             //ToastUtil.showToast(FaceActivity.this,getString(R.string.already_activated));
                             initFaceEngine();
                         } else {
-                            Toast.makeText(MainActivity.this, "激活失败", Toast.LENGTH_SHORT).show();
+                            engineState.setImageResource(R.mipmap.ic_red);
+                            Toast.makeText(MainActivity.this, "引擎激活失败", Toast.LENGTH_SHORT).show();
                         }
 
                         ActiveFileInfo activeFileInfo = new ActiveFileInfo();
@@ -322,7 +337,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void initFaceEngine() {
         ftEngine = new FaceEngine();
         ftInitCode = ftEngine.init(this, DetectMode.ASF_DETECT_MODE_IMAGE, DetectFaceOrientPriority.ASF_OP_ALL_OUT,
-                16, 16, FaceEngine.ASF_FACE_DETECT | FaceEngine.ASF_AGE | FaceEngine.ASF_FACE3DANGLE | FaceEngine.ASF_GENDER | FaceEngine.ASF_LIVENESS);
+                8, 16, FaceEngine.ASF_FACE_DETECT | FaceEngine.ASF_AGE | FaceEngine.ASF_FACE3DANGLE | FaceEngine.ASF_GENDER | FaceEngine.ASF_LIVENESS);
         if (ftInitCode != ErrorInfo.MOK) {
             String error = getString(R.string.specific_engine_init_failed, "ftEngine", ftInitCode);
             Log.i(TAG, "initEngine: " + error);
@@ -369,7 +384,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 BaseApplication.DevCode = code;
                 byte[] byte2 = new byte[]{(byte) 0xBF, (byte) 0xCF, 0x00, 0x03, 0x04, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, (byte) 0xDF, (byte) 0xEF};
                 byte[] b2 = code.getBytes();
-                System.arraycopy(b2,0,byte2,6,b2.length);
+                System.arraycopy(b2, 0, byte2, 6, b2.length);
                 ToastUtils.showShort("修改成功");
 
                 break;
@@ -428,6 +443,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         Log.i(TAG, "processImage: fd costTime = " + (System.currentTimeMillis() - fdStartTime));
                         Log.i(TAG, "faceSize:" + faceInfoList.size());
                     }
+                    long millis = System.currentTimeMillis();
                     /**
                      * 3.判断人脸的3D信息，排除半张脸
                      */
@@ -440,7 +456,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             if (face3DAngle.getYaw() > Constants.FACE_DEVIATION || face3DAngle.getYaw() < -Constants.FACE_DEVIATION) {
                                 faceInfoList.remove(i);
                             }
-                            Log.d(TAG, "Face3DAngle:Pitch:" + face3DAngle.getPitch() + ",Yaw:" + face3DAngle.getYaw());
+                            Log.d(TAG, "Image:" + millis + ",Face3DAngle-" + i + ":Pitch:" + face3DAngle.getPitch() + ",Yaw:" + face3DAngle.getYaw());
                         }
                     }
                     runOnUiThread(new Runnable() {
@@ -468,7 +484,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         for (FaceInfo faceInfo : faceInfoList) {
                             canvas.drawRect(faceInfo.getRect(), paint);
                         }
-                        String filePath = file1.getAbsolutePath() + File.separator + System.currentTimeMillis() + ".jpg";
+                        String filePath = file1.getAbsolutePath() + File.separator + millis + ".jpg";
                         fos1 = new FileOutputStream(filePath);
                         cavBitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos1);
                         fos1.close();
@@ -478,7 +494,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         String b64 = ImageUtils.ImageToBase64(filePath);
                         HttpUtils.saveFaceDetectRecord(b64, faceInfoList.size());
                     }
-                    Thread.sleep(300);
+                    Thread.sleep(800);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

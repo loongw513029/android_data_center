@@ -61,7 +61,7 @@ public class Httpd extends NanoHTTPD {
                         e.printStackTrace();
                     }
                 }
-                builder.append("{\"status\":\"true\",\"picdata\":\"" + b64Str + "\"}");
+                builder.append("{\"status\":true,\"picdata\":\"" + b64Str + "\"}");
                 asyncSendCardDataToPlatform(cardNo, time, b64Str);
             }
         }

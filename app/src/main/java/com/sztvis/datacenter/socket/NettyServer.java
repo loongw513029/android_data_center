@@ -124,7 +124,7 @@ public class NettyServer implements onChannelOperation {
     public static void sendDataToALL(byte[] msg) {
         for (Map.Entry<NettyServerHandler, SocketChannel> entry : channelMap.entrySet()) {
             entry.getKey().sendDataAPI(entry.getKey().getEquipId(), msg);
-            Log.d("NettyServer","发送对象:"+entry.getKey().getChannelHandler().channel());
+            Log.d("NettyServer","发送对象:"+entry.getKey().getChannelHandler());
         }
     }
 

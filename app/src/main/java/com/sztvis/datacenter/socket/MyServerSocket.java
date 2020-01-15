@@ -71,7 +71,7 @@ public class MyServerSocket {
 
     public void onAcceptRemotePeer(Socket remotePeer) {
         try {
-            remotePeer.getOutputStream().write("connected successful".getBytes());//告诉客户端连接成功
+            //remotePeer.getOutputStream().write("connected successful".getBytes());//告诉客户端连接成功
             // 从Socket当中得到InputStream对象
             InputStream inputStream = remotePeer.getInputStream();
             byte[] buffer = new byte[1024 * 4];
@@ -90,6 +90,7 @@ public class MyServerSocket {
         if(socket2!=null){
             try {
                 socket2.getOutputStream().write(bytes);
+                socket2.getOutputStream().flush();
             } catch (IOException e) {
                 e.printStackTrace();
             }

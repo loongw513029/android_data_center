@@ -13,6 +13,8 @@ import com.sztvis.datacenter.utils.ByteUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.timeout.IdleState;
@@ -115,8 +117,19 @@ public class NettyServerHandler extends ChannelInboundHandlerAdapter {
 
     public void sendDataAPI(String equipId, byte[] bytes) {
         if (channelHandler != null) {
-            channelHandler.channel().writeAndFlush(bytes);
-            Log.i(TAG, "向设备" + equipId + "发送了数据:" + ByteUtil.byteToHex(bytes));
+            ChannelFuture channelFuture = channelHandler.writeAndFlush(Unpooled.copiedBuffer(bytes));
+            Log.i(TAG, "向设备" + equipId + "发送了数据:" + ByteUtil.byteToHex(bytes) + ",结果：" + channelFuture.isSuccess());
+            channelFuture.addListener(new ChannelFutureListener() {
+                @Override
+                public void operationComplete(ChannelFuture future) throws Exception {
+                    if(future.isSuccess()){
+                        Log.i(TAG, "重发成功");
+                    }else{
+                        Log.i(TAG, future.cause().toString());
+                    }
+                }
+            });
+
         }
     }
 
